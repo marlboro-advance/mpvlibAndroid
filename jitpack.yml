@@ -1,9 +1,0 @@
-jdk:
-  - openjdk17
-env:
-  RELEASE_VERSION: "0.1.6"
-before_install:
-  - mkdir -p app/build/outputs/aar
-  - wget -O app/build/outputs/aar/mpv-android-lib-v$RELEASE_VERSION.aar https://github.com/abdallahmehiz/mpv-android/releases/download/v$RELEASE_VERSION/mpv-android-lib-v$RELEASE_VERSION.aar
-install:
-  - ./gradlew app:publishBarPublicationToMavenLocal
