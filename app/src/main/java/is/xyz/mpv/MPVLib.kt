@@ -134,6 +134,7 @@ object MPVLib {
         synchronized(observers) {
             for (o in observers) o.eventProperty(property, value)
         }
+        propLong.emit(property, value)
         propInt.emit(property, value.toInt())
     }
 
@@ -151,6 +152,7 @@ object MPVLib {
             for (o in observers) o.eventProperty(property, value)
         }
         propDouble.emit(property, value)
+        propFloat.emit(property, value.toFloat())
     }
 
     @JvmStatic
