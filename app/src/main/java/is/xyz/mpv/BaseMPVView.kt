@@ -5,6 +5,15 @@ import android.util.AttributeSet
 import android.util.Log
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import `is`.xyz.mpv.MPVLib.mpvFormat
+import `is`.xyz.mpv.MPVLib.observeProperty
+import `is`.xyz.mpv.MPVLib.propBoolean
+import `is`.xyz.mpv.MPVLib.propDouble
+import `is`.xyz.mpv.MPVLib.propFloat
+import `is`.xyz.mpv.MPVLib.propInt
+import `is`.xyz.mpv.MPVLib.propLong
+import `is`.xyz.mpv.MPVLib.propNode
+import `is`.xyz.mpv.MPVLib.propString
 
 // Contains only the essential code needed to get a picture on the screen
 
@@ -35,6 +44,7 @@ abstract class BaseMPVView(context: Context, attrs: AttributeSet) : SurfaceView(
 
         holder.addCallback(this)
         observeProperties()
+        reobserveAllProperties()
     }
 
     /**
@@ -87,7 +97,7 @@ abstract class BaseMPVView(context: Context, attrs: AttributeSet) : SurfaceView(
         MPVLib.setOptionString("force-window", "yes")
 
         if (filePath != null) {
-            MPVLib.command(arrayOf("loadfile", filePath as String))
+            MPVLib.command("loadfile", filePath as String)
             filePath = null
         } else {
             // We disable video output when the context disappears, enable it back
@@ -104,6 +114,16 @@ abstract class BaseMPVView(context: Context, attrs: AttributeSet) : SurfaceView(
         // FIXME: There could be a race condition here, because I don't think
         // setting a property will wait for VO deinit.
         MPVLib.detachSurface()
+    }
+
+    private fun reobserveAllProperties() {
+        propBoolean.map.keys.forEach { observeProperty(it, mpvFormat.MPV_FORMAT_FLAG) }
+        propString.map.keys.forEach { observeProperty(it, mpvFormat.MPV_FORMAT_STRING) }
+        propDouble.map.keys.forEach { observeProperty(it, mpvFormat.MPV_FORMAT_DOUBLE) }
+        propFloat.map.keys.forEach { observeProperty(it, mpvFormat.MPV_FORMAT_DOUBLE) }
+        propLong.map.keys.forEach { observeProperty(it, mpvFormat.MPV_FORMAT_INT64) }
+        propInt.map.keys.forEach { observeProperty(it, mpvFormat.MPV_FORMAT_INT64) }
+        propNode.map.keys.forEach { observeProperty(it, mpvFormat.MPV_FORMAT_NODE) }
     }
 
     companion object {
