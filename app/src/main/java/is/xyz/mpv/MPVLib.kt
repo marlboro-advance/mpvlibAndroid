@@ -31,8 +31,8 @@ object MPVLib {
     external fun attachSurface(surface: Surface)
     external fun detachSurface()
 
-    external fun command(cmd: Array<String>)
-    external fun commandNode(cmd: Array<String>): MPVNode?
+    external fun command(vararg cmd: String)
+    external fun commandNode(vararg cmd: String): MPVNode?
 
     external fun setOptionString(name: String, value: String): Int
 
