@@ -25,7 +25,7 @@ object MPVLib {
         }
     }
 
-    external fun create(appctx: Context?)
+    external fun create(appctx: Context)
     external fun init()
     external fun destroy()
     external fun attachSurface(surface: Surface)
@@ -222,7 +222,7 @@ object MPVLib {
         fun logMessage(prefix: String, level: Int, text: String)
     }
 
-    object mpvFormat {
+    object MpvFormat {
         const val MPV_FORMAT_NONE: Int = 0
         const val MPV_FORMAT_STRING: Int = 1
         const val MPV_FORMAT_OSD_STRING: Int = 2
@@ -235,7 +235,7 @@ object MPVLib {
         const val MPV_FORMAT_BYTE_ARRAY: Int = 9
     }
 
-    object mpvEventId {
+    object MpvEvent {
         const val MPV_EVENT_NONE: Int = 0
         const val MPV_EVENT_SHUTDOWN: Int = 1
         const val MPV_EVENT_LOG_MESSAGE: Int = 2
@@ -261,7 +261,7 @@ object MPVLib {
         const val MPV_EVENT_HOOK: Int = 25
     }
 
-    object mpvLogLevel {
+    object MpvLogLevel {
         const val MPV_LOG_LEVEL_NONE: Int = 0
         const val MPV_LOG_LEVEL_FATAL: Int = 10
         const val MPV_LOG_LEVEL_ERROR: Int = 20
