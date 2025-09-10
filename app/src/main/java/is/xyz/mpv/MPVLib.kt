@@ -84,13 +84,13 @@ object MPVLib {
 
         operator fun set(property: String, value: T) {
             when (type) {
-                mpvFormat.MPV_FORMAT_INT64 -> setPropertyInt(property, value as Int)
-                mpvFormat.MPV_FORMAT_FLAG -> setPropertyBoolean(property, value as Boolean)
-                mpvFormat.MPV_FORMAT_STRING -> setPropertyString(property, value as String)
-                mpvFormat.MPV_FORMAT_DOUBLE -> setPropertyDouble(property, value as Double)
-                mpvFormat.MPV_FORMAT_NODE,
-                mpvFormat.MPV_FORMAT_NODE_ARRAY,
-                mpvFormat.MPV_FORMAT_NODE_MAP -> setPropertyNode(property, value as MPVNode)
+                MpvFormat.MPV_FORMAT_INT64 -> setPropertyInt(property, value as Int)
+                MpvFormat.MPV_FORMAT_FLAG -> setPropertyBoolean(property, value as Boolean)
+                MpvFormat.MPV_FORMAT_STRING -> setPropertyString(property, value as String)
+                MpvFormat.MPV_FORMAT_DOUBLE -> setPropertyDouble(property, value as Double)
+                MpvFormat.MPV_FORMAT_NODE,
+                MpvFormat.MPV_FORMAT_NODE_ARRAY,
+                MpvFormat.MPV_FORMAT_NODE_MAP -> setPropertyNode(property, value as MPVNode)
                 else -> throw IllegalArgumentException("Unsupported property type")
             }
         }
@@ -100,18 +100,18 @@ object MPVLib {
         }
     }
 
-    val propInt = Property(mpvFormat.MPV_FORMAT_INT64, ::getPropertyInt)
-    val propBoolean = Property(mpvFormat.MPV_FORMAT_FLAG, ::getPropertyBoolean)
-    val propString = Property(mpvFormat.MPV_FORMAT_STRING, ::getPropertyString)
-    val propDouble = Property(mpvFormat.MPV_FORMAT_DOUBLE, ::getPropertyDouble)
-    val propNode = Property(mpvFormat.MPV_FORMAT_NODE, ::getPropertyNode)
+    val propInt = Property(MpvFormat.MPV_FORMAT_INT64, ::getPropertyInt)
+    val propBoolean = Property(MpvFormat.MPV_FORMAT_FLAG, ::getPropertyBoolean)
+    val propString = Property(MpvFormat.MPV_FORMAT_STRING, ::getPropertyString)
+    val propDouble = Property(MpvFormat.MPV_FORMAT_DOUBLE, ::getPropertyDouble)
+    val propNode = Property(MpvFormat.MPV_FORMAT_NODE, ::getPropertyNode)
 
     // Convenience properties for common types
-    val propLong = Property(mpvFormat.MPV_FORMAT_INT64, { getPropertyInt(it)?.toLong() })
-    val propFloat = Property(mpvFormat.MPV_FORMAT_DOUBLE, { getPropertyDouble(it)?.toFloat() })
+    val propLong = Property(MpvFormat.MPV_FORMAT_INT64, { getPropertyInt(it)?.toLong() })
+    val propFloat = Property(MpvFormat.MPV_FORMAT_DOUBLE, { getPropertyDouble(it)?.toFloat() })
 
     fun eventFlow(property: String): Flow<Unit> {
-        observeProperty(property, mpvFormat.MPV_FORMAT_NONE)
+        observeProperty(property, MpvFormat.MPV_FORMAT_NONE)
         return eventPropertyFlow.filter { it == property }.map { it }
     }
 
