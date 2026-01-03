@@ -59,9 +59,10 @@ static jobject frame_to_bitmap(JNIEnv *env, AVFrame *frame, int target_dimension
     init_methods_cache(env);
     
     // Create SwsContext for scaling and format conversion
+    // Android Bitmap.Config.ARGB_8888 expects BGRA byte order (little-endian)
     struct SwsContext *sws_ctx = sws_getContext(
         frame->width, frame->height, (AVPixelFormat)frame->format,
-        target_dimension, target_dimension, AV_PIX_FMT_RGBA,
+        target_dimension, target_dimension, AV_PIX_FMT_BGRA,
         SWS_FAST_BILINEAR,  // Fastest algorithm
         NULL, NULL, NULL
     );
