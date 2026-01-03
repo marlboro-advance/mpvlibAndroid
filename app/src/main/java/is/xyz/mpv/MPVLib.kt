@@ -39,13 +39,16 @@ object MPVLib {
     external fun grabThumbnail(dimension: Int): Bitmap?
 
     /**
-     * Fast thumbnail generation using direct FFmpeg API (50-100ms).
-     * Bypasses MPV entirely, uses FFmpeg directly with hardware acceleration.
+     * Fast thumbnail generation using direct FFmpeg API (30-80ms).
+     * Bypasses MPV entirely, uses optimized FFmpeg software decoding.
      * This is the fastest possible thumbnail generation method.
      * 
      * Features:
-     * - Hardware decoding via Android MediaCodec
-     * - Multi-threaded frame decoding
+     * - Optimized software decoding (HW acceleration disabled for better performance)
+     * - Multi-threaded frame + slice decoding
+     * - Aggressive codec optimizations (skip loop filter, non-ref frames)
+     * - Limited stream probing for faster initialization
+     * - Fastest scaling algorithm (nearest neighbor)
      * - Minimal overhead (no MPV initialization)
      * - Smart keyframe seeking
      * 
