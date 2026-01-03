@@ -63,7 +63,7 @@ static jobject frame_to_bitmap(JNIEnv *env, AVFrame *frame, int target_dimension
     struct SwsContext *sws_ctx = sws_getContext(
         frame->width, frame->height, (AVPixelFormat)frame->format,
         target_dimension, target_dimension, AV_PIX_FMT_BGRA,
-        SWS_POINT,  // Fastest algorithm - good quality for thumbnails
+        SWS_FAST_BILINEAR,  // Fastest algorithm
         NULL, NULL, NULL
     );
     
@@ -168,17 +168,12 @@ jni_func(jobject, grabThumbnailFast, jstring jpath, jdouble position, jint dimen
     
     env->ReleaseStringUTFChars(jpath, path);
     
-    // Find stream information (with limited analysis for speed)
-    AVDictionary *opts = NULL;
-    av_dict_set(&opts, "analyzeduration", "1000000", 0);  // 1 second max analysis
-    av_dict_set(&opts, "probesize", "5000000", 0);  // 5MB max probe size
-    if (avformat_find_stream_info(format_ctx, &opts) < 0) {
+    // Find stream information
+    if (avformat_find_stream_info(format_ctx, NULL) < 0) {
         ALOGE("grabThumbnailFast: Could not find stream info");
-        av_dict_free(&opts);
         avformat_close_input(&format_ctx);
         return NULL;
     }
-    av_dict_free(&opts);
     
     // ========================================================================
     // STEP 2: Find video stream
@@ -227,8 +222,8 @@ jni_func(jobject, grabThumbnailFast, jstring jpath, jdouble position, jint dimen
     }
     
     // OPTIMIZATION: Configure for speed
-    codec_ctx->thread_count = 2;  // 2-4 threads optimal for thumbnails
-    codec_ctx->thread_type = FF_THREAD_SLICE;  // Slice threading faster for single frames
+    codec_ctx->thread_count = 0;  // Auto-detect CPU cores
+    codec_ctx->thread_type = FF_THREAD_FRAME;
     codec_ctx->flags |= AV_CODEC_FLAG_LOW_DELAY;
     codec_ctx->flags2 |= AV_CODEC_FLAG2_FAST;
     
@@ -255,21 +250,13 @@ jni_func(jobject, grabThumbnailFast, jstring jpath, jdouble position, jint dimen
     }
     
     // ========================================================================
-    // STEP 4: Seek to position (optimized strategy)
+    // STEP 4: Seek to position
     // ========================================================================
     if (position > 0.0 && position < INT64_MAX / AV_TIME_BASE) {
         int64_t timestamp = (int64_t)(position * AV_TIME_BASE);
         
-        // Smart seeking: use BACKWARD for accuracy, ANY for speed on short seeks
-        int seek_flags = AVSEEK_FLAG_BACKWARD;
-        if (position < 5.0) {  // For positions < 5s, seek directly to any frame
-            seek_flags = AVSEEK_FLAG_ANY;
-        }
-        
-        // Seek to target frame using video stream index for better precision
-        if (av_seek_frame(format_ctx, video_stream_idx, 
-                          timestamp * video_stream->time_base.den / video_stream->time_base.num / AV_TIME_BASE,
-                          seek_flags) < 0) {
+        // Seek to nearest keyframe before position
+        if (av_seek_frame(format_ctx, -1, timestamp, AVSEEK_FLAG_BACKWARD) < 0) {
             ALOGW("grabThumbnailFast: Seek failed, using first frame");
         }
         
@@ -320,15 +307,8 @@ jni_func(jobject, grabThumbnailFast, jstring jpath, jdouble position, jint dimen
                         frame_time = frame->best_effort_timestamp * av_q2d(video_stream->time_base);
                     }
                     
-                    // OPTIMIZATION: Skip frames that are too early (saves decoding time)
-                    if (position > 0.0 && frame_time < position - 1.5) {
-                        // Still far from target, skip this frame
-                        av_frame_unref(frame);
-                        continue;
-                    }
-                    
-                    // Check if we've reached the desired position (with tolerance)
-                    if (position == 0.0 || frame_time >= position - 1.0) {
+                    // Check if we've reached the desired position
+                    if (position == 0.0 || frame_time >= position - 0.5) {
                         ALOGV("grabThumbnailFast: Found frame at %.2fs (target: %.2fs)", 
                               frame_time, position);
                         
@@ -376,22 +356,18 @@ jni_func(jobject, grabThumbnailFast, jstring jpath, jdouble position, jint dimen
 // This implementation is 2-3x faster than MPV-based approach because:
 // 
 // 1. Direct API access - No MPV initialization overhead
-// 2. Minimal decoding - Only decode frames we need, skip unnecessary frames
+// 2. Minimal decoding - Only decode frames we need
 // 3. Hardware acceleration - Uses MediaCodec when available
-// 4. Smart seeking - Adaptive seek strategy based on position
+// 4. Fast seeking - Seeks to keyframe, then decode forward
 // 5. No unnecessary features - Just decode and convert
-// 6. Optimized codec flags - Fast decoding mode with optimal thread count
-// 7. Thread parallelism - Slice threading optimized for single frames
-// 8. Fast scaling - SWS_POINT algorithm for maximum speed
-// 9. Limited stream analysis - Quick probe for faster file opening
-// 10. Frame skipping - Skip decoding frames far from target position
+// 6. Optimized codec flags - Fast decoding mode
+// 7. Thread parallelism - Multi-threaded frame decoding
 //
-// Typical performance (after optimizations):
-// - H.264 1080p: 30-50ms (was 50-80ms)
-// - H.264 720p:  20-35ms (was 30-50ms)
-// - HEVC 1080p:  40-70ms (was 60-100ms, if HW decoder available)
-// - VP9:         50-85ms (was 70-120ms)
+// Typical performance:
+// - H.264 1080p: 50-80ms
+// - H.264 720p:  30-50ms
+// - HEVC 1080p:  60-100ms (if HW decoder available)
+// - VP9:         70-120ms
 //
-// Performance improvements: 40-60% faster than previous implementation
 // Main bottleneck: File I/O and codec initialization (one-time per file)
 // ============================================================================
