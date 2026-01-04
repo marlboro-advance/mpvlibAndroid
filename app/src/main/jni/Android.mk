@@ -76,8 +76,7 @@ LOCAL_SRC_FILES := \
 	property.cpp \
 	event.cpp \
 	node.cpp \
-	thumbnail.cpp \
-	thumbnail_fast.cpp
+	thumbnail.cpp
 LOCAL_LDLIBS    := -llog -lGLESv3 -lEGL -latomic
 LOCAL_SHARED_LIBRARIES := swscale avcodec avformat avutil mpv
 

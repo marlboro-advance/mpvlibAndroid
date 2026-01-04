@@ -26,7 +26,6 @@ abstract class BaseMPVView(context: Context, attrs: AttributeSet) : SurfaceView(
     fun initialize(configDir: String, cacheDir: String) {
         MPVLib.create(context)
 
-        /* set normal options (user-supplied config can override) */
         MPVLib.setOptionString("config", "yes")
         MPVLib.setOptionString("config-dir", configDir)
         for (opt in arrayOf("gpu-shader-cache-dir", "icc-cache-dir"))
@@ -35,11 +34,8 @@ abstract class BaseMPVView(context: Context, attrs: AttributeSet) : SurfaceView(
 
         MPVLib.init()
 
-        /* set hardcoded options */
         postInitOptions()
-        // could mess up VO init before surfaceCreated() is called
         MPVLib.setOptionString("force-window", "no")
-        // need to idle at least once for playFile() logic to work
         MPVLib.setOptionString("idle", "once")
 
         holder.addCallback(this)
@@ -53,7 +49,6 @@ abstract class BaseMPVView(context: Context, attrs: AttributeSet) : SurfaceView(
      * Call this once before the view is destroyed.
      */
     fun destroy() {
-        // Disable surface callbacks to avoid using unintialized mpv state
         holder.removeCallback(this)
         clearAllProperties()
         MPVLib.destroy()
@@ -93,14 +88,12 @@ abstract class BaseMPVView(context: Context, attrs: AttributeSet) : SurfaceView(
     override fun surfaceCreated(holder: SurfaceHolder) {
         Log.w(TAG, "attaching surface")
         MPVLib.attachSurface(holder.surface)
-        // This forces mpv to render subs/osd/whatever into our surface even if it would ordinarily not
         MPVLib.setOptionString("force-window", "yes")
 
         if (filePath != null) {
             MPVLib.command("loadfile", filePath as String)
             filePath = null
         } else {
-            // We disable video output when the context disappears, enable it back
             MPVLib.setPropertyString("vo", voInUse)
         }
     }
@@ -109,10 +102,6 @@ abstract class BaseMPVView(context: Context, attrs: AttributeSet) : SurfaceView(
         Log.w(TAG, "detaching surface")
         MPVLib.setPropertyString("vo", "null")
         MPVLib.setPropertyString("force-window", "no")
-        // Note that before calling detachSurface() we need to be sure that libmpv
-        // is done using the surface.
-        // FIXME: There could be a race condition here, because I don't think
-        // setting a property will wait for VO deinit.
         MPVLib.detachSurface()
     }
 

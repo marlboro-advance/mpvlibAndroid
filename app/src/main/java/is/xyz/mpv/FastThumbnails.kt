@@ -6,37 +6,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * Fast thumbnail generation using direct FFmpeg API.
- * 
- * High-performance thumbnail generation (30-80ms per thumbnail) that bypasses MPV 
- * and uses optimized FFmpeg software decoding for maximum speed.
- * 
- * Features:
- * - Dimension-based scaling: scales longest side to target dimension, preserving aspect ratio
- * - Optimized software decoding (HW acceleration disabled for better single-frame performance)
- * - Multi-threaded frame + slice decoding
- * - Aggressive codec optimizations (skip loop filter, non-ref frames)
- * - Limited stream probing for faster initialization
- * - Point scaling for maximum speed
- * - Smart keyframe seeking
- * - Minimal overhead (no MPV initialization)
- * 
- * Usage:
- * ```kotlin
- * // Initialize once (in Application.onCreate)
- * FastThumbnails.initialize(applicationContext)
- * 
- * // Generate thumbnail at 512x512
- * val bitmap = FastThumbnails.generate("/path/video.mp4", 10.0, 512)
- * 
- * // Generate at 256x256 without hardware acceleration
- * val bitmap = FastThumbnails.generate("/path/video.mp4", 10.0, 256, useHwDec = false)
- * 
- * // Or async with coroutines
- * val bitmap = FastThumbnails.generateAsync("/path/video.mp4", 10.0, 360)
- * ```
- */
 object FastThumbnails {
     private val initialized = AtomicBoolean(false)
     
@@ -60,8 +29,7 @@ object FastThumbnails {
     fun isInitialized(): Boolean = initialized.get()
     
     /**
-     * Generate thumbnail using fast FFmpeg direct API (30-80ms).
-     * Uses optimized software decoding for maximum speed.
+     * Generate thumbnail using fast FFmpeg direct API
      * 
      * @param path File path or URL to the video
      * @param position Time position in seconds (default: 0.0)

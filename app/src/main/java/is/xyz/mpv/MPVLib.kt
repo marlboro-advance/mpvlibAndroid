@@ -14,8 +14,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-// Wrapper for native library
-
 @Suppress("unused")
 object MPVLib {
     init {
@@ -37,35 +35,7 @@ object MPVLib {
     external fun setOptionString(name: String, value: String): Int
 
     external fun grabThumbnail(dimension: Int): Bitmap?
-
-    /**
-     * Fast thumbnail generation using direct FFmpeg API (30-80ms).
-     * Bypasses MPV entirely, uses optimized FFmpeg software decoding.
-     * 
-     * Features:
-     * - Dimension-based scaling: scales longest side to target dimension, preserving aspect ratio
-     * - Optimized software decoding (HW acceleration disabled for better performance)
-     * - Multi-threaded frame + slice decoding
-     * - Aggressive codec optimizations (skip loop filter, non-ref frames)
-     * - Limited stream probing for faster initialization
-     * - Point scaling for maximum speed
-     * - Minimal overhead (no MPV initialization)
-     * - Smart keyframe seeking
-     * 
-     * @param path File path or URL to extract thumbnail from
-     * @param position Time position in seconds (0.0 for beginning)
-     * @param dimension Max dimension for the thumbnail (width or height)
-     * @param useHwDec Whether to use hardware acceleration if available (default true)
-     * @return Bitmap of the thumbnail, or null if extraction fails
-     */
     external fun grabThumbnailFast(path: String, position: Double = 0.0, dimension: Int, useHwDec: Boolean = true): Bitmap?
-    
-    /**
-     * Initialize fast thumbnail generation system. 
-     * Call this once before using grabThumbnailFast (typically in Application.onCreate).
-     * 
-     * @param appctx Application context
-     */
     external fun setThumbnailJavaVM(appctx: Context)
 
     external fun getPropertyInt(property: String): Int?
@@ -79,7 +49,6 @@ object MPVLib {
     external fun getPropertyNode(property: String): MPVNode?
     external fun setPropertyNode(property: String, node: MPVNode)
 
-    // TODO: Maybe implement some actual jni functions for these types?
     @JvmStatic
     fun getPropertyFloat(property: String) = getPropertyDouble(property)?.toFloat()
     @JvmStatic
@@ -136,7 +105,6 @@ object MPVLib {
     val propDouble = Property(MpvFormat.MPV_FORMAT_DOUBLE, ::getPropertyDouble)
     val propNode = Property(MpvFormat.MPV_FORMAT_NODE, ::getPropertyNode)
 
-    // Convenience properties for common types
     val propLong = Property(MpvFormat.MPV_FORMAT_INT64, { getPropertyInt(it)?.toLong() })
     val propFloat = Property(MpvFormat.MPV_FORMAT_DOUBLE, { getPropertyDouble(it)?.toFloat() })
 
