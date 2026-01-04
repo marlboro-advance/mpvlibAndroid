@@ -32,7 +32,7 @@ lifecycleScope.launch {
     val bitmap = FastThumbnails.generateAsync(
         path = "/sdcard/video.mp4",
         position = 10.0,  // seconds
-        dimension = 256   // 256x256 pixels
+        dimension = 256   // Max dimension (preserves aspect ratio)
     )
     imageView.setImageBitmap(bitmap)
 }
@@ -173,35 +173,40 @@ FastThumbnails.isInitialized(): Boolean
 FastThumbnails.generate(
     path: String,
     position: Double = 0.0,
-    dimension: Int = 256
+    dimension: Int = 256,
+    useHwDec: Boolean = true
 ): Bitmap?
 
 // Generate (async)
 suspend FastThumbnails.generateAsync(
     path: String,
     position: Double = 0.0,
-    dimension: Int = 256
+    dimension: Int = 256,
+    useHwDec: Boolean = true
 ): Bitmap?
 
 // Generate multiple
 FastThumbnails.generateMultiple(
     path: String,
     positions: List<Double>,
-    dimension: Int = 256
+    dimension: Int = 256,
+    useHwDec: Boolean = true
 ): List<Bitmap?>
 
 // Generate multiple (async)
 suspend FastThumbnails.generateMultipleAsync(
     path: String,
     positions: List<Double>,
-    dimension: Int = 256
+    dimension: Int = 256,
+    useHwDec: Boolean = true
 ): List<Bitmap?>
 
 // Benchmark
 FastThumbnails.benchmark(
     path: String,
     position: Double = 0.0,
-    dimension: Int = 256
+    dimension: Int = 256,
+    useHwDec: Boolean = true
 ): Pair<Bitmap?, Long>  // Returns (bitmap, timeInMs)
 ```
 
@@ -227,7 +232,20 @@ FastThumbnails.benchmark(
 
 ## Hardware Acceleration
 
-The implementation automatically uses Android's MediaCodec for hardware decoding when available:
+The implementation uses Android's MediaCodec for hardware decoding by default (`useHwDec = true`).
+
+**Configuration:**
+You can disable hardware acceleration if needed (e.g. for debugging or specific device compatibility issues):
+
+```kotlin
+// Disable hardware acceleration
+val bitmap = FastThumbnails.generate(
+    path = "/path/to/video.mp4", 
+    position = 10.0, 
+    dimension = 256, 
+    useHwDec = false
+)
+```
 
 **Supported with hardware acceleration:**
 - H.264 / AVC (most common)
@@ -270,7 +288,7 @@ See [`THUMBNAIL_EXAMPLE.kt`](THUMBNAIL_EXAMPLE.kt) for complete working examples
 
 **Comparison to old method:**
 - Old API: 1500-2000ms (20-30x slower!)
-- This implementation: 50-100ms ⚡
+- This implementation: 50-100ms 
 
 ## Summary
 

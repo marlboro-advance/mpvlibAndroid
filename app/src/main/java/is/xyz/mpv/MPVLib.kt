@@ -43,21 +43,22 @@ object MPVLib {
      * Bypasses MPV entirely, uses optimized FFmpeg software decoding.
      * 
      * Features:
-     * - Quality-based scaling: 1-10 scale where 10 = original dimensions, 1 = 10% size
+     * - Dimension-based scaling: scales longest side to target dimension, preserving aspect ratio
      * - Optimized software decoding (HW acceleration disabled for better performance)
      * - Multi-threaded frame + slice decoding
      * - Aggressive codec optimizations (skip loop filter, non-ref frames)
      * - Limited stream probing for faster initialization
-     * - Bilinear scaling for good quality when downscaling
+     * - Point scaling for maximum speed
      * - Minimal overhead (no MPV initialization)
      * - Smart keyframe seeking
      * 
      * @param path File path or URL to extract thumbnail from
      * @param position Time position in seconds (0.0 for beginning)
-     * @param quality Quality/size scale 1-10 (10 = original dimensions, 5 = 50%, 1 = 10%)
+     * @param dimension Max dimension for the thumbnail (width or height)
+     * @param useHwDec Whether to use hardware acceleration if available (default true)
      * @return Bitmap of the thumbnail, or null if extraction fails
      */
-    external fun grabThumbnailFast(path: String, position: Double = 0.0, quality: Int = 10): Bitmap?
+    external fun grabThumbnailFast(path: String, position: Double = 0.0, dimension: Int, useHwDec: Boolean = true): Bitmap?
     
     /**
      * Initialize fast thumbnail generation system. 

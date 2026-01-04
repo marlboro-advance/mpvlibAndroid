@@ -20,7 +20,8 @@ lifecycleScope.launch {
     val bitmap = FastThumbnails.generateAsync(
         path = "/sdcard/video.mp4",
         position = 10.0,  // seconds
-        dimension = 256   // 256x256 px
+        dimension = 256,  // Max dimension (aspect ratio preserved)
+        useHwDec = true   // Enable hardware acceleration (default: true)
     )
     imageView.setImageBitmap(bitmap)
 }
@@ -32,7 +33,8 @@ lifecycleScope.launch {
 Bitmap bitmap = FastThumbnails.generate(
     "/sdcard/video.mp4",
     10.0,   // seconds
-    256     // 256x256 px
+    256,    // Max dimension
+    true    // Enable hardware acceleration (default: true)
 );
 ```
 
@@ -71,15 +73,16 @@ seekBar.setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
 | Method | Description | Returns |
 |--------|-------------|---------|
 | `initialize(context)` | One-time setup | `Unit` |
-| `generate(path, pos, dim)` | Sync generation | `Bitmap?` |
-| `generateAsync(path, pos, dim)` | Async with coroutines | `Bitmap?` |
-| `generateMultiple(path, positions, dim)` | Multiple positions | `List<Bitmap?>` |
+| `generate(path, pos, dim, hw)` | Sync generation | `Bitmap?` |
+| `generateAsync(path, pos, dim, hw)` | Async with coroutines | `Bitmap?` |
+| `generateMultiple(path, positions, dim, hw)` | Multiple positions | `List<Bitmap?>` |
 
 ### Parameters
 
 - **path**: File path or URL (String)
 - **position**: Time in seconds (Double, default: 0.0)
-- **dimension**: Square size in pixels (Int, default: 256)
+- **dimension**: Max dimension in pixels (Int, default: 512). Preserves aspect ratio.
+- **useHwDec**: Enable hardware acceleration (Boolean, default: true)
 
 ### Returns
 - `Bitmap?` - Success returns bitmap, failure returns `null`
@@ -104,7 +107,7 @@ seekBar.setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
 ```kotlin
 lifecycleScope.launch {
     try {
-        val bitmap = FastThumbnails.generateAsync(path, position)
+        val bitmap = FastThumbnails.generateAsync(path, position, useHwDec = true)
         if (bitmap != null) {
             imageView.setImageBitmap(bitmap)
         } else {
@@ -152,7 +155,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(imageView)
         
         lifecycleScope.launch {
-            val bitmap = FastThumbnails.generateAsync("/sdcard/video.mp4")
+            val bitmap = FastThumbnails.generateAsync("/sdcard/video.mp4", useHwDec = true)
             imageView.setImageBitmap(bitmap)
         }
     }
