@@ -1,4 +1,4 @@
 jdk:
   - openjdk17
-before_install:
-  - ./scripts/setup.sh
+install:
+  - ./gradlew clean -Pgroup=com.github.marlboro-advance -xtest -xlint publishToMavenLocal

@@ -44,8 +44,10 @@ afterEvaluate {
             release(MavenPublication) {
                 from components.release
                 
-                // Use project group if provided, otherwise default
+                // Use groupId from project properties (JitPack will set this appropriately)
                 groupId = project.findProperty('group') ?: 'com.github.marlboro-advance'
+                
+                // Use a consistent artifactId that represents your library
                 artifactId = 'mpvlib'
                 
                 // Use project version if provided, otherwise use the version from defaultConfig
