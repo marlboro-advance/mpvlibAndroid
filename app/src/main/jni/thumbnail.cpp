@@ -24,7 +24,7 @@ extern "C" {
 
 extern "C" {
     jni_func(jobject, grabThumbnail, jint dimension);
-    jni_func(jobject, grabThumbnailFast, jstring jpath, jdouble position, jint dimension, jboolean use_hw_dec, jint quality);
+    jni_func(jobject, grabThumbnailFast, jstring jpath, jdouble position, jint dimension, jboolean use_hw_dec);
     jni_func(void, setThumbnailJavaVM, jobject appctx);
     jni_func(void, clearThumbnailCache);
 };
@@ -144,7 +144,7 @@ jni_func(jobject, grabThumbnail, jint dimension) {
 
     auto total_end = std::chrono::high_resolution_clock::now();
     auto total_duration = std::chrono::duration_cast<std::chrono::milliseconds>(total_end - total_start);
-    ALOGI("Thumbnail (MPV) | Success: %lldms", (long long)total_duration.count());
+    ALOGI("Thumbnail (MPV) | %lldms", (long long)total_duration.count());
 
     return bitmap;
 }
@@ -293,51 +293,23 @@ jni_func(void, clearThumbnailCache) {
     }
 }
 
-// Quality level constants
-enum ThumbnailQuality {
-    QUALITY_FAST = 0,   // Fast extraction - lower quality
-    QUALITY_NORMAL = 1, // Normal quality (default)
-    QUALITY_HQ = 2      // High quality
-};
-
-// Helper function to get quality name for logging
-static const char* get_quality_name(int quality) {
-    switch (quality) {
-        case QUALITY_FAST: return "FAST";
-        case QUALITY_HQ: return "HQ";
-        case QUALITY_NORMAL:
-        default: return "NORMAL";
-    }
-}
-
-// Helper function to get scaling algorithm name for logging
-static const char* get_scaling_algorithm_name(int algorithm) {
-    switch (algorithm) {
-        case SWS_FAST_BILINEAR: return "FAST_BILINEAR";
-        case SWS_LANCZOS: return "LANCZOS";
-        case SWS_POINT: return "POINT";
-        default: return "UNKNOWN";
-    }
-}
+// Fast extraction is the only mode - optimized for speed
 
 // Convert AVFrame to Android Bitmap
-static jobject frame_to_bitmap(JNIEnv *env, AVFrame *frame, int target_dimension, int quality) {
+static jobject frame_to_bitmap(JNIEnv *env, AVFrame *frame, int target_dimension) {
     init_methods_cache(env);
     
     // Calculate scaled dimensions while preserving aspect ratio
-    // target_dimension is the maximum size for the largest side
     int width = frame->width;
     int height = frame->height;
     
     if (width > 0 && height > 0) {
         float scale = 1.0f;
         if (width >= height) {
-            // Landscape or square: constrain width
             if (width > target_dimension) {
                 scale = (float)target_dimension / width;
             }
         } else {
-            // Portrait: constrain height
             if (height > target_dimension) {
                 scale = (float)target_dimension / height;
             }
@@ -350,20 +322,8 @@ static jobject frame_to_bitmap(JNIEnv *env, AVFrame *frame, int target_dimension
     if (width < 1) width = 1;
     if (height < 1) height = 1;
 
-    // Select scaling algorithm based on quality
-    int sws_algorithm;
-    switch (quality) {
-        case QUALITY_FAST:
-            sws_algorithm = SWS_FAST_BILINEAR;
-            break;
-        case QUALITY_HQ:
-            sws_algorithm = SWS_LANCZOS;
-            break;
-        case QUALITY_NORMAL:
-        default:
-            sws_algorithm = SWS_POINT;
-            break;
-    }
+    // Use fast bilinear scaling for speed
+    int sws_algorithm = SWS_FAST_BILINEAR;
 
     // Create SwsContext for scaling and format conversion
     // Android Bitmap.Config.ARGB_8888 expects BGRA byte order (little-endian)
@@ -430,39 +390,28 @@ static jobject frame_to_bitmap(JNIEnv *env, AVFrame *frame, int target_dimension
     return bitmap;
 }
 
-jni_func(jobject, grabThumbnailFast, jstring jpath, jdouble position, jint dimension, jboolean use_hw_dec, jint quality) {
+jni_func(jobject, grabThumbnailFast, jstring jpath, jdouble position, jint dimension, jboolean use_hw_dec) {
     auto total_start = std::chrono::high_resolution_clock::now();
     
     std::lock_guard<std::mutex> lock(g_thumb_mutex);
-    
-    // Ensure JNI cache is initialized
     init_methods_cache(env);
     
     // Validate parameters
     if (dimension <= 0 || dimension > 4096) {
-        ALOGE("Thumbnail | ✗ Invalid dimension %d (must be 1-4096)", dimension);
+        ALOGE("Thumbnail | Invalid dimension");
         return NULL;
     }
     
     if (position < 0.0) {
-        ALOGE("Thumbnail | ✗ Invalid position %.2f (must be >= 0)", position);
+        ALOGE("Thumbnail | Invalid position");
         return NULL;
-    }
-    
-    // Validate quality parameter
-    if (quality < 0 || quality > 2) {
-        ALOGW("Thumbnail | Invalid quality %d, using NORMAL (1)", quality);
-        quality = 1;
     }
     
     const char *path = env->GetStringUTFChars(jpath, NULL);
     if (!path) {
-        ALOGE("Thumbnail | ✗ Invalid path");
+        ALOGE("Thumbnail | Invalid path");
         return NULL;
     }
-    
-    ALOGV("Thumbnail | Start: pos=%.1fs dim=%dpx quality=%s hw=%d",
-          position, dimension, get_quality_name(quality), use_hw_dec);
     
     // Open video file
     AVFormatContext *format_ctx = NULL;
@@ -527,14 +476,14 @@ jni_func(jobject, grabThumbnailFast, jstring jpath, jdouble position, jint dimen
         return NULL;
     }
     
-    // Ultra-aggressive speed optimizations
+    // Optimized for speed
     codec_ctx->thread_count = 0;
     codec_ctx->thread_type = FF_THREAD_SLICE;
     codec_ctx->flags |= AV_CODEC_FLAG_LOW_DELAY;
     codec_ctx->flags2 |= AV_CODEC_FLAG2_FAST;
     codec_ctx->skip_frame = AVDISCARD_NONREF;
     codec_ctx->skip_idct = AVDISCARD_BIDIR;
-    codec_ctx->skip_loop_filter = (quality == QUALITY_HQ) ? AVDISCARD_NONKEY : AVDISCARD_ALL;
+    codec_ctx->skip_loop_filter = AVDISCARD_ALL;
     codec_ctx->export_side_data = 0;
     codec_ctx->err_recognition = 0;
     codec_ctx->workaround_bugs = 0;
@@ -616,7 +565,7 @@ jni_func(jobject, grabThumbnailFast, jstring jpath, jdouble position, jint dimen
                     
                     // Accept frame if close to target
                     if (position == 0.0 || frame_time >= position - match_tolerance) {
-                        bitmap = frame_to_bitmap(env, frame, dimension, quality);
+                        bitmap = frame_to_bitmap(env, frame, dimension);
                         if (bitmap) {
                             frame_found = true;
                         } else {
@@ -648,11 +597,10 @@ jni_func(jobject, grabThumbnailFast, jstring jpath, jdouble position, jint dimen
     auto total_duration = std::chrono::duration_cast<std::chrono::milliseconds>(total_end - total_start);
     
     if (!frame_found) {
-        ALOGE("Thumbnail | Failed: no frame found (pos=%.1fs, decoded=%d, time=%lldms)",
-              position, frames_decoded, (long long)total_duration.count());
+        ALOGE("Thumbnail | Failed: no frame found");
         return NULL;
     }
     
-    ALOGI("Thumbnail | Success: %lldms", (long long)total_duration.count());
+    ALOGI("Thumbnail | %lldms", (long long)total_duration.count());
     return bitmap;
 }

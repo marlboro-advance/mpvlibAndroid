@@ -35,7 +35,7 @@ object MPVLib {
     external fun setOptionString(name: String, value: String): Int
 
     external fun grabThumbnail(dimension: Int): Bitmap?
-    external fun grabThumbnailFast(path: String, position: Double = 0.0, dimension: Int, useHwDec: Boolean = true, quality: Int = 1): Bitmap?
+    external fun grabThumbnailFast(path: String, position: Double = 0.0, dimension: Int, useHwDec: Boolean = true): Bitmap?
     external fun setThumbnailJavaVM(appctx: Context)
     external fun clearThumbnailCache()
 
