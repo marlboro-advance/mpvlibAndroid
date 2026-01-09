@@ -29,41 +29,6 @@ extern "C" {
     jni_func(void, clearThumbnailCache);
 };
 
-// Automatic cleanup on library unload
-static void cleanup_thumbnail_resources() __attribute__((destructor));
-static void cleanup_thumbnail_resources() {
-    ALOGI("Thumbnail | Library unloading, cleaning up resources...");
-    
-    // Clear codec cache
-    {
-        std::lock_guard<std::mutex> lock(g_codec_cache_mutex);
-        g_codec_cache.clear();
-    }
-    
-    // Release hardware context
-    {
-        std::lock_guard<std::mutex> lock(g_hw_ctx_mutex);
-        if (g_hw_device_ctx) {
-            av_buffer_unref(&g_hw_device_ctx);
-            g_hw_device_ctx = nullptr;
-        }
-    }
-    
-    // Release JNI global references
-    {
-        std::lock_guard<std::mutex> lock(g_thumb_mutex);
-        if (g_thumb_appctx && g_thumb_vm) {
-            JNIEnv* env = nullptr;
-            if (g_thumb_vm->GetEnv((void**)&env, JNI_VERSION_1_6) == JNI_OK && env) {
-                env->DeleteGlobalRef(g_thumb_appctx);
-                g_thumb_appctx = nullptr;
-            }
-        }
-    }
-    
-    ALOGI("Thumbnail | Cleanup completed");
-}
-
 // ============================================================================
 // MPV-BASED THUMBNAIL GENERATION
 // Takes a snapshot of the currently playing video in MPV
@@ -292,6 +257,41 @@ static bool init_hw_device_context() {
     ALOGI("Thumbnail | Hardware device context initialized successfully");
     g_hw_ctx_available = true;
     return true;
+}
+
+// Automatic cleanup on library unload
+static void cleanup_thumbnail_resources() __attribute__((destructor));
+static void cleanup_thumbnail_resources() {
+    ALOGI("Thumbnail | Library unloading, cleaning up resources...");
+    
+    // Clear codec cache
+    {
+        std::lock_guard<std::mutex> lock(g_codec_cache_mutex);
+        g_codec_cache.clear();
+    }
+    
+    // Release hardware context
+    {
+        std::lock_guard<std::mutex> lock(g_hw_ctx_mutex);
+        if (g_hw_device_ctx) {
+            av_buffer_unref(&g_hw_device_ctx);
+            g_hw_device_ctx = nullptr;
+        }
+    }
+    
+    // Release JNI global references
+    {
+        std::lock_guard<std::mutex> lock(g_thumb_mutex);
+        if (g_thumb_appctx && g_thumb_vm) {
+            JNIEnv* env = nullptr;
+            if (g_thumb_vm->GetEnv((void**)&env, JNI_VERSION_1_6) == JNI_OK && env) {
+                env->DeleteGlobalRef(g_thumb_appctx);
+                g_thumb_appctx = nullptr;
+            }
+        }
+    }
+    
+    ALOGI("Thumbnail | Cleanup completed");
 }
 
 jni_func(void, setThumbnailJavaVM, jobject appctx) {
