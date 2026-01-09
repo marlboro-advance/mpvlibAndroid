@@ -29,6 +29,21 @@ object FastThumbnails {
     fun isInitialized(): Boolean = initialized.get()
     
     /**
+     * Clear internal codec cache and hardware context.
+     * Call this when you want to free up memory (e.g., onLowMemory callback).
+     * The cache will be rebuilt automatically on next thumbnail generation.
+     * 
+     * Note: Clearing the cache will make the next thumbnail generation slightly slower
+     * as codecs need to be re-initialized, but subsequent calls will be fast again.
+     */
+    @JvmStatic
+    fun clearCache() {
+        if (initialized.get()) {
+            MPVLib.clearThumbnailCache()
+        }
+    }
+    
+    /**
      * Generate thumbnail using fast FFmpeg direct API
      * 
      * @param path File path or URL to the video
