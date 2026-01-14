@@ -299,9 +299,32 @@ jni_func(void, clearThumbnailCache) {
 static jobject frame_to_bitmap(JNIEnv *env, AVFrame *frame, int target_dimension) {
     init_methods_cache(env);
     
+    // Handle hardware frames - transfer to software
+    AVFrame *sw_frame = nullptr;
+    AVFrame *use_frame = frame;
+    
+    if (frame->format == AV_PIX_FMT_MEDIACODEC ||
+        frame->hw_frames_ctx != nullptr) {
+        sw_frame = av_frame_alloc();
+        if (!sw_frame) {
+            ALOGE("Thumbnail | Failed to allocate sw_frame");
+            return NULL;
+        }
+        
+        if (av_hwframe_transfer_data(sw_frame, frame, 0) < 0) {
+            ALOGE("Thumbnail | Failed to transfer hw frame to sw");
+            av_frame_free(&sw_frame);
+            return NULL;
+        }
+        
+        sw_frame->pts = frame->pts;
+        use_frame = sw_frame;
+        ALOGV("Thumbnail | Transferred HW frame to SW");
+    }
+    
     // Calculate scaled dimensions while preserving aspect ratio
-    int width = frame->width;
-    int height = frame->height;
+    int width = use_frame->width;
+    int height = use_frame->height;
     
     if (width > 0 && height > 0) {
         float scale = 1.0f;
@@ -328,13 +351,14 @@ static jobject frame_to_bitmap(JNIEnv *env, AVFrame *frame, int target_dimension
     // Create SwsContext for scaling and format conversion
     // Android Bitmap.Config.ARGB_8888 expects BGRA byte order (little-endian)
     struct SwsContext *sws_ctx = sws_getContext(
-        frame->width, frame->height, (AVPixelFormat)frame->format,
+        use_frame->width, use_frame->height, (AVPixelFormat)use_frame->format,
         width, height, AV_PIX_FMT_BGRA,
         sws_algorithm, NULL, NULL, NULL
     );
     
     if (!sws_ctx) {
-        ALOGE("Thumbnail | Failed to create scaler");
+        ALOGE("Thumbnail | Failed to create scaler for format %d", use_frame->format);
+        if (sw_frame) av_frame_free(&sw_frame);
         return NULL;
     }
     
@@ -342,6 +366,7 @@ static jobject frame_to_bitmap(JNIEnv *env, AVFrame *frame, int target_dimension
     if (!arr) {
         ALOGE("Thumbnail | Failed to allocate array");
         sws_freeContext(sws_ctx);
+        if (sw_frame) av_frame_free(&sw_frame);
         return NULL;
     }
     
@@ -350,13 +375,15 @@ static jobject frame_to_bitmap(JNIEnv *env, AVFrame *frame, int target_dimension
         ALOGE("Thumbnail | Failed to get array elements");
         env->DeleteLocalRef(arr);
         sws_freeContext(sws_ctx);
+        if (sw_frame) av_frame_free(&sw_frame);
         return NULL;
     }
     
     uint8_t *dst_data[4] = { (uint8_t*)pixels };
     int dst_linesize[4] = { width * 4 };
-    sws_scale(sws_ctx, frame->data, frame->linesize, 0, frame->height, dst_data, dst_linesize);
+    sws_scale(sws_ctx, use_frame->data, use_frame->linesize, 0, use_frame->height, dst_data, dst_linesize);
     sws_freeContext(sws_ctx);
+    if (sw_frame) av_frame_free(&sw_frame);
     env->ReleaseIntArrayElements(arr, pixels, 0);
     
     jobject bitmap_config = env->GetStaticObjectField(
@@ -434,16 +461,68 @@ jni_func(jobject, grabThumbnailFast, jstring jpath, jdouble position, jint dimen
         return NULL;
     }
     
-    // Find video stream
+    // Find video stream and check for embedded thumbnails
     int video_stream_idx = -1;
+    int embedded_thumb_idx = -1;
     AVCodecParameters *codec_params = NULL;
     
     for (unsigned int i = 0; i < format_ctx->nb_streams; i++) {
-        if (format_ctx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-            video_stream_idx = i;
-            codec_params = format_ctx->streams[i]->codecpar;
-            break;
+        AVStream *stream = format_ctx->streams[i];
+        
+        // Check for attached picture (embedded thumbnail/cover art)
+        if (stream->disposition & AV_DISPOSITION_ATTACHED_PIC) {
+            embedded_thumb_idx = i;
+            ALOGV("Thumbnail | Found embedded thumbnail in stream %d", i);
         }
+        
+        if (stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO && video_stream_idx == -1) {
+            // Skip attached pictures as main video stream
+            if (!(stream->disposition & AV_DISPOSITION_ATTACHED_PIC)) {
+                video_stream_idx = i;
+                codec_params = stream->codecpar;
+            }
+        }
+    }
+    
+    // Try to use embedded thumbnail first (much faster)
+    if (embedded_thumb_idx >= 0 && position == 0.0) {
+        AVStream *thumb_stream = format_ctx->streams[embedded_thumb_idx];
+        AVPacket *pkt = &thumb_stream->attached_pic;
+        
+        if (pkt->data && pkt->size > 0) {
+            // Decode the embedded image
+            const AVCodec *img_codec = avcodec_find_decoder(thumb_stream->codecpar->codec_id);
+            if (img_codec) {
+                AVCodecContext *img_ctx = avcodec_alloc_context3(img_codec);
+                if (img_ctx) {
+                    if (avcodec_parameters_to_context(img_ctx, thumb_stream->codecpar) >= 0 &&
+                        avcodec_open2(img_ctx, img_codec, NULL) >= 0) {
+                        
+                        AVFrame *img_frame = av_frame_alloc();
+                        if (img_frame) {
+                            if (avcodec_send_packet(img_ctx, pkt) >= 0 &&
+                                avcodec_receive_frame(img_ctx, img_frame) >= 0) {
+                                
+                                jobject bitmap = frame_to_bitmap(env, img_frame, dimension);
+                                av_frame_free(&img_frame);
+                                avcodec_free_context(&img_ctx);
+                                avformat_close_input(&format_ctx);
+                                
+                                if (bitmap) {
+                                    auto total_end = std::chrono::high_resolution_clock::now();
+                                    auto total_duration = std::chrono::duration_cast<std::chrono::milliseconds>(total_end - total_start);
+                                    ALOGI("Thumbnail (embedded) | %lldms", (long long)total_duration.count());
+                                    return bitmap;
+                                }
+                            }
+                            av_frame_free(&img_frame);
+                        }
+                    }
+                    avcodec_free_context(&img_ctx);
+                }
+            }
+        }
+        ALOGV("Thumbnail | Embedded thumbnail decoding failed, falling back to video decode");
     }
     
     if (video_stream_idx == -1) {

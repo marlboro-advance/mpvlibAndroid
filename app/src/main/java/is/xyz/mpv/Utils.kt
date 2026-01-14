@@ -107,7 +107,7 @@ object Utils {
 
         val candidates = mutableListOf<String>()
         // check all media dirs, there's usually one on each storage volume
-        // Using safe call to handle potential null values in the array
+        @Suppress("DEPRECATION")
         context.externalMediaDirs?.filterNotNull()?.forEach {
             candidates.add(it.absolutePath)
         }
@@ -130,7 +130,7 @@ object Utils {
                 continue
 
             // find the actual root path of that volume
-            while (root.parentFile != null && storageManager.getStorageVolume(root.parentFile) == vol) {
+            while (root.parentFile != null && storageManager.getStorageVolume(root.parentFile!!) == vol) {
                 root = root.parentFile!!
             }
 
@@ -296,9 +296,10 @@ object Utils {
     )
 
     val VERSIONS = Versions(
-        mpv = "%MPV_VERSION%",
-        buildDate = "%DATE%",
-        libPlacebo = "%LIBPLACEBO_VERSION%",
-        ffmpeg = "%FFMPEG_VERSION%",
-    )
+            mpv = "%MPV_VERSION%",
+            buildDate = "%DATE%",
+            libPlacebo = "%LIBPLACEBO_VERSION%",
+            ffmpeg = "%FFMPEG_VERSION%",
+    )  
+
 }

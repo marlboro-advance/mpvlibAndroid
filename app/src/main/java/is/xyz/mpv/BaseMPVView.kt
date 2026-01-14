@@ -32,9 +32,49 @@ abstract class BaseMPVView(context: Context, attrs: AttributeSet) : SurfaceView(
             MPVLib.setOptionString(opt, cacheDir)
         initOptions()
 
+        // Optimized video rendering (MX Player-like quality on all devices)
+        MPVLib.setOptionString("vo", "gpu")
+        MPVLib.setOptionString("gpu-context", "android")
+        MPVLib.setOptionString("opengl-es", "yes")
+        
+        // Balanced scaling (sharp quality, low GPU cost)
+        MPVLib.setOptionString("scale", "lanczos")
+        MPVLib.setOptionString("cscale", "lanczos")
+        MPVLib.setOptionString("dscale", "lanczos")
+        MPVLib.setOptionString("scale-radius", "2")  // Fast lanczos
+        
+        // Color and quality
+        MPVLib.setOptionString("dither-depth", "auto")
+        MPVLib.setOptionString("deband", "yes")
+        MPVLib.setOptionString("deband-iterations", "1")
+        MPVLib.setOptionString("deband-threshold", "48")
+        MPVLib.setOptionString("deband-range", "16")
+        MPVLib.setOptionString("deband-grain", "24")
+        MPVLib.setOptionString("temporal-dither", "yes")
+        
+        // Hardware decoding (with software fallback)
+        MPVLib.setOptionString("hwdec", "mediacodec-copy")  // Best compatibility
+        MPVLib.setOptionString("hwdec-codecs", "h264,hevc,vp8,vp9,av1")
+        
+        // Smooth playback without dropped frames
+        MPVLib.setOptionString("video-sync", "audio")
+        MPVLib.setOptionString("framedrop", "decoder+vo")  // Smart frame drop
+        MPVLib.setOptionString("video-latency-hacks", "yes")
+        
+        // Optimized cache
+        MPVLib.setOptionString("demuxer-max-bytes", "64MiB")
+        MPVLib.setOptionString("demuxer-max-back-bytes", "32MiB")
+        MPVLib.setOptionString("demuxer-readahead-secs", "5")
+        MPVLib.setOptionString("cache", "yes")
+        
+        // Audio
+        MPVLib.setOptionString("audio-pitch-correction", "yes")
+        MPVLib.setOptionString("ao", "audiotrack")
+
         MPVLib.init()
 
         postInitOptions()
+        MPVLib.setOptionString("keep-open", "yes")
         MPVLib.setOptionString("force-window", "no")
         MPVLib.setOptionString("idle", "once")
 
@@ -83,6 +123,14 @@ abstract class BaseMPVView(context: Context, attrs: AttributeSet) : SurfaceView(
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
         MPVLib.setPropertyString("android-surface-size", "${width}x$height")
+        // Force redraw when paused to fix broken image after orientation change
+        val paused = MPVLib.getPropertyBoolean("pause")
+        if (paused == true) {
+            val pos = MPVLib.getPropertyDouble("time-pos")
+            if (pos != null) {
+                MPVLib.command("seek", pos.toString(), "absolute", "exact")
+            }
+        }
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
