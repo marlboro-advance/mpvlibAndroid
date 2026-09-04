@@ -18,7 +18,12 @@ loadarch () {
 	unset CC CXX CPATH LIBRARY_PATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH
 	unset CFLAGS CXXFLAGS CPPFLAGS LDFLAGS
 
-	local apilvl=21
+	# Must be >= 24: the NDK sysroot only ships libvulkan.so from API 24 on, and
+	# scripts/mpv.sh builds with -Dvulkan=enabled, so linking libmpv.so at 21
+	# fails with "ld.lld: error: unable to find library -lvulkan".
+	# Matches app/src/main/jni/Application.mk (APP_PLATFORM := android-24) and
+	# the library's minSdk.
+	local apilvl=24
 	# ndk_triple: what the toolchain actually is
 	# cc_triple: what Google pretends the toolchain is
 	if [ "$1" == "armv7l" ]; then
